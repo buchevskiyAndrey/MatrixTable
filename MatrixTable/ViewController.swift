@@ -11,11 +11,7 @@ class ViewController: UIViewController {
 
     typealias DataSource = UITableViewDiffableDataSource<Section, Item>
 
-    var items: [Item] = [] {
-        didSet {
-            reload()
-        }
-    }
+    var items: [Item] = []
 
     var selectedItemClosure: ((Item) -> Void)?
 
@@ -40,8 +36,7 @@ class ViewController: UIViewController {
             shuffledList.append(Item(title: "\(i)", isSelected: false))
         }
         shuffledList.shuffle()
-        items = shuffledList
-
+        reload(items: shuffledList, animatingDifferences: false)
         title = "Matrix Table"
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Shuffle", style: .plain, target: self, action: #selector(shuffleTapped))
     }
@@ -61,33 +56,44 @@ class ViewController: UIViewController {
         }
     }
 
-    private func reload() {
+
+    private func reload(items: [Item], animatingDifferences: Bool) {
+        self.items = items
         var snapshot = NSDiffableDataSourceSnapshot<Section, Item>()
 
         snapshot.appendSections([.numbers])
         snapshot.appendItems(items, toSection: .numbers)
 
         DispatchQueue.main.async { [weak self] in
-            self?.dataSource?.apply(snapshot)
+            self?.dataSource?.apply(snapshot, animatingDifferences: animatingDifferences)
         }
     }
 
     @objc func shuffleTapped() {
         var shuffledList = items
         shuffledList.shuffle()
-        items = shuffledList
+        reload(items: shuffledList, animatingDifferences: true)
     }
 }
 
 extension ViewController: UITableViewDelegate {
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: false)
-        var currentItems = items
         var item = items[indexPath.row]
-        currentItems.remove(at: indexPath.row)
-        item.isSelected = true
-        currentItems.insert(item, at: 0)
-        items = currentItems
+
+        if item.isSelected {
+            var currentItems = items
+            item.isSelected = false
+            currentItems[indexPath.row] = item
+            items = currentItems
+            reload(items: currentItems, animatingDifferences: false)
+        } else {
+            var currentItems = items
+            currentItems.remove(at: indexPath.row)
+            item.isSelected = true
+            currentItems.insert(item, at: 0)
+            reload(items: currentItems, animatingDifferences: true)
+        }
     }
 }
 
@@ -100,4 +106,8 @@ struct Item: Hashable {
     let title: String
 
     var isSelected: Bool
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(title)
+    }
 }
